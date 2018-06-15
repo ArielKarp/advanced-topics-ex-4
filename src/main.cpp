@@ -5,8 +5,18 @@
  *      Author: ariel
  */
 
+#include <string>
+#include <utility>
+
 
 #include "GameBoard.h"
+//#include "ex4_header.h"
+#include "unit_test_util.h"
+
+using std::string;
+using std::get;
+using std::cout;
+using std::endl;
 
 
 class A{
@@ -17,23 +27,67 @@ public:
 	}
 };
 
+static bool test1(){
+	GameBoard<12, 7, string, 4> board;
+	int i = 0;
+	for (int row = 0; row < 12; row++){
+		for(int col =0; col < 7; col++){
+			board.setPiece(row, col, "Piece", i);
+			i = (i+1)%4;
+		}
+	}
+
+	int occurence[4]= {0,0,0,0};
+	for(auto pieceInfo : board){
+		occurence[get<3>(pieceInfo)]++;
+	}
+	for(int i = 0;i<4;i++){
+		if (occurence[i] != 21){
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool test2(){
+	GameBoard<12, 7, string, 4> board;
+	int i = 0;
+	for (int row = 0; row < 12; row++){
+		for(int col =0; col < 7; col++){
+			board.setPiece(row, col, "Piece", i);
+			i = (i+1)%4;
+		}
+	}
+
+	cout << "print board" << endl;
+
+	for (int row = 0; row < 12; row++){
+		for(int col =0; col < 7; col++){
+			cout << (board.getPiece(row, col)->first) << " ";
+		}
+		cout << endl;
+	}
+	cout << endl;
+	int occurence[4]= {0,0,0,0};
+	for(auto pieceInfo : board.allPiecesOfPlayer(0)){
+		occurence[get<3>(pieceInfo)]++;
+	}
+	for(int i = 1;i<4;i++){
+		if (occurence[i] != 0){
+			return false;
+		}
+	}
+	if (occurence[0] != 21) {
+		return false;
+	}
+	return true;
+}
+
+
 
 int main(int argc, char* argv[]) {
-	GameBoard<10, 10, char> board1;
-	board1.print();
-	board1.setPiece(0, 0, '4', 0);
-	board1.setPiece(1, 1, '0', 0);
-	board1.setPiece(2, 2, '1', 0);
-	board1.setPiece(3, 3, '2', 0);
-	//for (auto& l_piece : board1) {
-	//	std::cout << std::get<2>(l_piece) << std::endl;
-	//}
-//	GameBoard<10, 10, A> board2;
-	GameBoard<10, 10, char>::GeneralIter iter = board1.begin();
-	for (; iter != board1.end(); ++iter) {
-		std::cout << std::get<2>(*iter) << std::endl;
-		//exit(1);
-	}
+	RUN_TEST(test1);
+	RUN_TEST(test2);
 	return 0;
 }
 

@@ -15,10 +15,14 @@
 
 //using std::make_unqiue;
 using std::unique_ptr;
+using std::make_shared;
 using std::make_pair;
+using std::shared_ptr;
 using std::pair;
 using std::cout;
 using std::endl;
+
+enum class SearchType { REG, BY_PLAYER, BY_PIECE, BOTH };
 
 template<typename GAME_PIECE>
 using PieceInfo = std::unique_ptr<const std::pair<int, GAME_PIECE>>;
@@ -27,25 +31,8 @@ template<int ROWS, int COLS, class GAME_PIECE, int PLAYER_NUM = 2>
 class GameBoard {
 public:
 
-	GameBoard(): m_rows(ROWS), m_cols(COLS), m_player_num(PLAYER_NUM) {
-		// init board
-		m_board = new Elem**[m_rows];
-		for (int i = 0; i < m_rows; ++i) {
-			m_board[i] = new Elem*[m_cols];
-		}
-		for (int i = 0; i < m_rows; ++i) {
-			for (int j = 0; j < m_cols; ++j) {
-				m_board[i][j] = nullptr;
-			}
-		}
-
-	}
-	~GameBoard() {
-		for (int i = 0; i < m_rows; ++i) {
-			delete[] m_board[i];
-		}
-		delete[] m_board;
-	}
+	GameBoard() {}
+	~GameBoard() {}
 
 	GameBoard operator=(const GameBoard&) = delete;
 
@@ -65,7 +52,7 @@ public:
 		PieceInfo<GAME_PIECE> l_prevPiece = getPiece(row, col);
 		if (m_board[row][col] == nullptr) {
 			// new piece
-			m_board[row][col] = new Elem(player, piece);
+			m_board[row][col] = make_shared<Elem>(player, piece);
 		} else {
 			m_board[row][col]->setPlayerNum(player);
 			m_board[row][col]->setGamePiece(piece);
@@ -85,42 +72,76 @@ public:
 		GAME_PIECE m_piece;
 	};
 
-	class GeneralIter {
+	class iter {
 	public:
-		GeneralIter(int a_rows, int a_cols, int a_row, int a_col, Elem*** a_boardHandle = nullptr):
-		m_rows(a_rows), m_cols(a_cols), m_row(a_row), m_col(a_col), m_boardHandle(a_boardHandle){
+		// reg iter
+		iter(int a_row, int a_col, shared_ptr<Elem> (&a_boardHandle)[ROWS][COLS]):
+		m_row(a_row), m_col(a_col), m_boardHandle(a_boardHandle), m_iterType(SearchType::REG){
+			m_playerNum = -1;
+		}
+
+		// by player iter
+		iter(int a_row, int a_col, shared_ptr<Elem> (&a_boardHandle)[ROWS][COLS], int playerNum):
+			m_row(a_row), m_col(a_col), m_boardHandle(a_boardHandle), m_iterType(SearchType::BY_PLAYER), m_playerNum(playerNum){
 		}
 
 		const std::tuple<int, int, GAME_PIECE, int> operator*() {
 			return std::tuple<int, int, GAME_PIECE, int>(m_row, m_col, m_boardHandle[m_row][m_col]->getPiece(), m_boardHandle[m_row][m_col]->getPlayerNum());
 		}
-		GeneralIter& operator++() {
-
-			// get to end of row
-			for (int j = (m_col + 1); j < m_cols; ++j) {
-				if (m_boardHandle[m_row][j] != nullptr) {
-					cout << "Inside location : i " << m_row << " j :" << j << endl;
-					m_col = j;
-					return *this;
-				}
-			}
-
-			// go over the board
-			for (int i = (m_row + 1); i < m_rows; ++i) {
-				for (int j = 0; j < m_cols; ++j) {
-					if (m_boardHandle[i][j] != nullptr) {
-						m_row = i;
-						m_col = i;
+		iter& operator++() {
+			if (m_iterType == SearchType::REG) {
+				// get to end of row
+				for (int j = (m_col + 1); j < COLS; ++j) {
+					if (m_boardHandle[m_row][j] != nullptr) {
+						// updating location of this
+						m_col = j;
 						return *this;
 					}
 				}
+
+				// go over the board
+				for (int i = (m_row + 1); i < ROWS; ++i) {
+					for (int j = 0; j < COLS; ++j) {
+						if (m_boardHandle[i][j] != nullptr) {
+							// updating location of this
+							m_row = i;
+							m_col = j;
+							return *this;
+						}
+					}
+				}
+				// in case not on board, set to end
+				m_row = ROWS;
+				m_col = COLS;
+				return *this;
+			} else if (m_iterType == SearchType::BY_PLAYER) {
+				// get to end of row
+				for (int j = (m_col + 1); j < COLS; ++j) {
+					if (m_boardHandle[m_row][j] != nullptr && m_boardHandle[m_row][j]->getPlayerNum() == m_playerNum) {
+						// updating location of this
+						m_col = j;
+						return *this;
+					}
+				}
+
+				// go over the board
+				for (int i = (m_row + 1); i < ROWS; ++i) {
+					for (int j = 0; j < COLS; ++j) {
+						if (m_boardHandle[i][j] != nullptr && m_boardHandle[i][j]->getPlayerNum() == m_playerNum) {
+							// updating location of this
+							m_row = i;
+							m_col = j;
+							return *this;
+						}
+					}
+				}
+				// in case not on board, set to end
+				m_row = ROWS;
+				m_col = COLS;
+				return *this;
 			}
-			// in case not on board, set to end
-			m_row++;
-			m_col++;
-			return *this;
 		}
-		bool operator!= (GeneralIter a_otherGenIter) {
+		bool operator!= (iter a_otherGenIter) {
 			if (m_row != a_otherGenIter.m_row || m_col != a_otherGenIter.m_col) {
 				return true;
 			}
@@ -128,20 +149,58 @@ public:
 			//return m_pos != a_otherGenIter.m_pos;
 		}
 	private:
-		int m_rows;
-		int m_cols;
 		int m_row;
 		int m_col;
-		Elem*** m_boardHandle;
+		//GAME_PIECE m_pieceToSearch;
+		shared_ptr<Elem> m_boardHandle[ROWS][COLS];
+		SearchType m_iterType;
+		int m_playerNum;
 	};
 
-	GeneralIter begin() {
+	class FilterBoard {
+	public:
+		// Filter by player num
+		FilterBoard(int a_playerNum, shared_ptr<Elem> (&a_boardHandle)[ROWS][COLS]):
+		m_playerNum(a_playerNum), m_boardHandle(a_boardHandle){}
+
+		iter begin() {
+			// search for starting pos
+			int l_row = 0;
+			int l_col = 0;
+			int flag = 0;
+			for (int i = 0; i < ROWS && !flag; ++i) {
+				for (int j = 0; j < COLS; ++j) {
+					if (m_boardHandle[i][j] != nullptr && m_boardHandle[i][j]->getPlayerNum() == m_playerNum) {
+						l_row = i;
+						l_col = j;
+						flag = 1;
+						break;
+					}
+				}
+			}
+			// if not found
+			if (!flag) {
+				l_row = ROWS;
+				l_col = COLS;
+			}
+			return iter(l_row, l_col, m_boardHandle, m_playerNum);
+		}
+		iter end() {
+			return iter(ROWS, COLS, m_boardHandle, m_playerNum);
+		}
+	private:
+		int m_playerNum;
+		shared_ptr<Elem> m_boardHandle[ROWS][COLS];
+	};
+
+
+	iter begin() {
 		// search for starting pos
 		int l_row = 0;
 		int l_col = 0;
 		int flag = 0;
-		for (int i = 0; i < m_rows && !flag; ++i) {
-			for (int j = 0; j < m_cols; ++j) {
+		for (int i = 0; i < ROWS && !flag; ++i) {
+			for (int j = 0; j < COLS; ++j) {
 				if (m_board[i][j] != nullptr) {
 					l_row = i;
 					l_col = j;
@@ -150,17 +209,27 @@ public:
 				}
 			}
 		}
-		return GeneralIter(m_rows, m_cols, l_row, l_col, m_board);
-	}
-	GeneralIter end() {
-		return GeneralIter(m_rows, m_cols, m_rows, m_cols);
+		// if not found
+		if (!flag) {
+			l_row = ROWS;
+			l_col = COLS;
+		}
+		return iter(l_row, l_col, m_board);
 	}
 
+	iter end() {
+		return iter(ROWS, COLS, m_board);
+	}
+
+
+	FilterBoard allPiecesOfPlayer(int playerNum) {
+		return FilterBoard(playerNum, m_board);
+	}
+
+
+
 private:
-	Elem*** m_board;
-	int m_rows;
-	int m_cols;
-	int m_player_num;
+	shared_ptr<Elem> m_board[ROWS][COLS];
 };
 
 
