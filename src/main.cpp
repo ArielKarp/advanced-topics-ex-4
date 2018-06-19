@@ -139,12 +139,68 @@ static bool test4(){
 }
 
 // test iter by player with class int
+static bool test5(){
+	GameBoard<10, 10, int, 4> board;
+	// set all board for 0, for all players
+	int i = 0;
+	for (int row = 0; row < 10; row++){
+		for(int col =0; col < 10; col++){
+			board.setPiece(row, col, 0, i);
+			i = (i+1)%4;
+		}
+	}
+
+	int occurence[4]= {0,0,0,0};
+	// all occurences of player 4 of
+	for(auto pieceInfo : board.allPiecesOfPlayer(3)){
+		occurence[get<3>(pieceInfo)]++;
+	}
+	for(int i = 0;i<3;i++){
+		if (occurence[i] != 0){
+			return false;
+		}
+	}
+	if (occurence[3] != 25) {
+		return false;
+	}
+	return true;
+}
 
 // test general iter with default numbers of players
+static bool test6(){
+	GameBoard<20, 20, string> board;
+	// set all board for 0, for all players
+	int i = 0;
+	for (int row = 0; row < 20; row++){
+		for(int col =0; col < 20; col++){
+			board.setPiece(row, col, "Piece", i);
+			i = (i+1)%2;
+		}
+	}
+
+	int occurence[2]= {0,0};
+	// all occurences of player 4 of
+	for(auto pieceInfo : board){
+		occurence[get<3>(pieceInfo)]++;
+	}
+	if (occurence[0] != 200 || occurence[1] != 200) {
+		return false;
+	}
+	return true;
+}
 
 // test for elem that is not in board
 
 // test for empty board
+static bool test7(){
+	GameBoard<20, 20, string> board;
+
+	for (auto& piece : board) {
+		return false;
+	}
+	return true;
+}
+
 
 
 // **************************** Abnormals ***********************************************
@@ -154,12 +210,19 @@ static bool test4(){
 // invalid class piece to search
 
 
+// *********************************** others
+
+
+
 
 int main(int argc, char* argv[]) {
 	RUN_TEST(test1);
 	RUN_TEST(test2);
 	RUN_TEST(test3);
 	RUN_TEST(test4);
+	RUN_TEST(test5);
+	RUN_TEST(test6);
+	RUN_TEST(test7);
 	return 0;
 }
 
